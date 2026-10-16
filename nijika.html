@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ニジカ 友だち計測テスト</title>
+<style>
+  body{font-family:-apple-system,"Hiragino Sans",sans-serif;margin:0;padding:16px;background:#f5f5f5;color:#222}
+  h1{font-size:18px}
+  dl{background:#fff;border-radius:8px;padding:12px 16px;display:grid;grid-template-columns:auto 1fr;gap:8px 12px}
+  dt{color:#666}dd{margin:0;word-break:break-all;font-weight:600}
+  .ok{color:#06c755}.ng{color:#d33}
+  a.btn,button{display:block;width:100%;box-sizing:border-box;margin-top:12px;padding:14px;border:0;border-radius:8px;background:#06c755;color:#fff;font-size:16px;text-align:center;text-decoration:none}
+  button{background:#333}
+  pre{white-space:pre-wrap;font-size:12px;color:#d33}
+</style>
+</head>
+<body>
+<h1>ニジカ 計測テスト（素材ID × 友だち追加）</h1>
+<dl id="out"><dt>状態</dt><dd>初期化中…</dd></dl>
+<a class="btn" id="add" href="https://line.me/R/ti/p/@304uclyx" style="display:none">友だち追加する</a>
+<button id="recheck" style="display:none">友だち状態を再確認</button>
+<pre id="err"></pre>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+  var LIFF_ID = '2012053550-pf1oyIw3';
+  var out = document.getElementById('out');
+  function show(rows){
+    out.innerHTML = rows.map(function(r){ return '<dt>'+r[0]+'</dt><dd class="'+(r[2]||'')+'">'+r[1]+'</dd>'; }).join('');
+  }
+  async function check(){
+    var cr = (new URLSearchParams(location.search).get('cr') || '').match(/S\d{3}/);
+    var profile = await liff.getProfile();
+    var fr = await liff.getFriendship();
+    show([
+      ['素材ID(cr)', cr ? cr[0] : '（なし）', cr ? 'ok' : 'ng'],
+      ['ユーザーID', profile.userId.slice(0,6) + '…' + profile.userId.slice(-4)],
+      ['友だち', fr.friendFlag ? '追加済み' : '未追加', fr.friendFlag ? 'ok' : 'ng'],
+      ['LINE内ブラウザ', liff.isInClient() ? 'はい' : 'いいえ'],
+      ['OS', liff.getOS()],
+      ['URL', location.href]
+    ]);
+    document.getElementById('add').style.display = fr.friendFlag ? 'none' : 'block';
+    document.getElementById('recheck').style.display = 'block';
+  }
+  document.getElementById('recheck').onclick = function(){ check().catch(fail); };
+  function fail(e){ document.getElementById('err').textContent = String(e && (e.message || e)); }
+  liff.init({ liffId: LIFF_ID })
+    .then(function(){
+      if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
+      return check();
+    })
+    .catch(fail);
+</script>
+</body>
+</html>
