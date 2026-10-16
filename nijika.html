@@ -3,54 +3,91 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ニジカ 友だち計測テスト</title>
+<meta name="robots" content="noindex">
+<title>ニジカ</title>
 <style>
-  body{font-family:-apple-system,"Hiragino Sans",sans-serif;margin:0;padding:16px;background:#f5f5f5;color:#222}
-  h1{font-size:18px}
-  dl{background:#fff;border-radius:8px;padding:12px 16px;display:grid;grid-template-columns:auto 1fr;gap:8px 12px}
-  dt{color:#666}dd{margin:0;word-break:break-all;font-weight:600}
-  .ok{color:#06c755}.ng{color:#d33}
-  a.btn,button{display:block;width:100%;box-sizing:border-box;margin-top:12px;padding:14px;border:0;border-radius:8px;background:#06c755;color:#fff;font-size:16px;text-align:center;text-decoration:none}
-  button{background:#333}
-  pre{white-space:pre-wrap;font-size:12px;color:#d33}
+  body{font-family:-apple-system,"Hiragino Sans",sans-serif;margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;color:#555}
+  .sp{width:36px;height:36px;border:4px solid #e5e5e5;border-top-color:#06c755;border-radius:50%;animation:r .8s linear infinite}
+  @keyframes r{to{transform:rotate(360deg)}}
+  p{font-size:14px;margin-top:14px}
+  [hidden]{display:none!important}
+  dl{font-size:13px;padding:16px;display:grid;grid-template-columns:auto 1fr;gap:6px 12px}
+  dd{margin:0;word-break:break-all;font-weight:600}
 </style>
 </head>
 <body>
-<h1>ニジカ 計測テスト（素材ID × 友だち追加）</h1>
-<dl id="out"><dt>状態</dt><dd>初期化中…</dd></dl>
-<a class="btn" id="add" href="https://line.me/R/ti/p/@304uclyx" style="display:none">友だち追加する</a>
-<button id="recheck" style="display:none">友だち状態を再確認</button>
-<pre id="err"></pre>
+<div class="sp" id="sp"></div>
+<p id="msg">読み込み中…</p>
+<dl id="dbg" hidden></dl>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
+  /*
+   * ニジカ 友だち計測の中継ページ（LIFF）
+   * 素材(cr) × LINE内部ID × 友だちかどうか をGASに送り、
+   * 未追加 → 友だち追加画面 ／ 追加済み → トーク画面 へ自動で移動する。
+   * どこかで失敗したら今までの lin.ee に逃がす（行き止まりにしない）。
+   * ?debug=1 を付けると移動せずに中身を表示する（テスト用・記録にも debug=1 が付く）
+   */
   var LIFF_ID = '2012053550-pf1oyIw3';
-  var out = document.getElementById('out');
-  function show(rows){
-    out.innerHTML = rows.map(function(r){ return '<dt>'+r[0]+'</dt><dd class="'+(r[2]||'')+'">'+r[1]+'</dd>'; }).join('');
+  var GAS_URL = 'https://script.google.com/macros/s/AKfycbzs6rdA4mMJ9s4WflDtZV9eRwgTUOjSZq5FaLLCokpHXqhj_QRkF-ljFOUDvxQ5hYHv3A/exec';
+  var FALLBACK = 'https://lin.ee/TCvJzFb';
+  var ADD_URL = 'https://line.me/R/ti/p/@304uclyx';
+  var CHAT_URL = 'https://line.me/R/oaMessage/@304uclyx/';
+
+  var params = new URLSearchParams(location.search);
+  var debug = params.get('debug') === '1';
+  var done = false;
+
+  function go(url) {
+    if (done) return;
+    done = true;
+    if (debug) {
+      document.getElementById('sp').hidden = true;
+      document.getElementById('msg').textContent = '移動先：' + url;
+      return;
+    }
+    location.replace(url);
   }
-  async function check(){
-    var cr = (new URLSearchParams(location.search).get('cr') || '').match(/S\d{3}/);
-    var profile = await liff.getProfile();
-    var fr = await liff.getFriendship();
-    show([
-      ['素材ID(cr)', cr ? cr[0] : '（なし）', cr ? 'ok' : 'ng'],
-      ['ユーザーID', profile.userId.slice(0,6) + '…' + profile.userId.slice(-4)],
-      ['友だち', fr.friendFlag ? '追加済み' : '未追加', fr.friendFlag ? 'ok' : 'ng'],
-      ['LINE内ブラウザ', liff.isInClient() ? 'はい' : 'いいえ'],
-      ['OS', liff.getOS()],
-      ['URL', location.href]
-    ]);
-    document.getElementById('add').style.display = fr.friendFlag ? 'none' : 'block';
-    document.getElementById('recheck').style.display = 'block';
+
+  function send(data) {
+    if (!GAS_URL) return Promise.resolve();
+    var req = fetch(GAS_URL, {
+      method: 'POST', mode: 'no-cors', keepalive: true,
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(data)
+    }).catch(function () {});
+    // 記録が遅くてもユーザーを待たせない
+    return Promise.race([req, new Promise(function (r) { setTimeout(r, 1500); })]);
   }
-  document.getElementById('recheck').onclick = function(){ check().catch(fail); };
-  function fail(e){ document.getElementById('err').textContent = String(e && (e.message || e)); }
-  liff.init({ liffId: LIFF_ID })
-    .then(function(){
-      if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
-      return check();
-    })
-    .catch(fail);
+
+  // SDK読み込み失敗・初期化の固まり対策
+  setTimeout(function () { go(FALLBACK); }, 8000);
+
+  if (!window.liff) {
+    go(FALLBACK);
+  } else {
+    liff.init({ liffId: LIFF_ID })
+      .then(function () {
+        if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
+        return Promise.all([liff.getProfile(), liff.getFriendship()]).then(function (r) {
+          var data = {
+            cr: new URLSearchParams(location.search).get('cr') || '',
+            userId: r[0].userId,
+            friend: r[1].friendFlag,
+            os: liff.getOS(),
+            debug: debug
+          };
+          if (debug) {
+            var dl = document.getElementById('dbg');
+            dl.hidden = false;
+            dl.innerHTML = '<dt>cr</dt><dd>' + data.cr.replace(/</g, '&lt;') + '</dd><dt>友だち</dt><dd>' +
+              (data.friend ? '追加済み' : '未追加') + '</dd><dt>LINE内</dt><dd>' + (liff.isInClient() ? 'はい' : 'いいえ') + '</dd>';
+          }
+          return send(data).then(function () { go(data.friend ? CHAT_URL : ADD_URL); });
+        });
+      })
+      .catch(function () { go(FALLBACK); });
+  }
 </script>
 </body>
 </html>
