@@ -34,8 +34,8 @@
   var ADD_URL = 'https://line.me/R/ti/p/@304uclyx';
   var CHAT_URL = 'https://line.me/R/oaMessage/@304uclyx/';
 
-  var params = new URLSearchParams(location.search);
-  var debug = params.get('debug') === '1';
+  // 初期化前は ?liff.state=%3Fdebug%3D1 の形で来るので両方の書き方を見る
+  var debug = /debug(=|%3D)1/.test(location.search);
   var done = false;
 
   function go(url) {
