@@ -49,6 +49,24 @@
     location.replace(url);
   }
 
+  // LINEアプリ内では初回 ?liff.state=%3Fcr%3D… の形で届き、その後SDKが ?cr=… に開き直す。
+  // 開き直しを待たずに移動するので、liff.state の中からも cr を読む
+  // 初期化でURLが書き換わっても読めるよう、読み込み時点のURLも残しておく
+  var INITIAL_SEARCH = location.search;
+  function crFrom(search) {
+    var p = new URLSearchParams(search);
+    var cr = p.get('cr');
+    var st = p.get('liff.state');
+    if (!cr && st) {
+      var q = st.indexOf('?');
+      cr = new URLSearchParams(q >= 0 ? st.slice(q + 1) : st).get('cr');
+    }
+    return cr || '';
+  }
+  function getCr() {
+    return crFrom(location.search) || crFrom(INITIAL_SEARCH);
+  }
+
   function send(data) {
     if (!GAS_URL) return Promise.resolve();
     var req = fetch(GAS_URL, {
@@ -71,7 +89,7 @@
         if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
         return Promise.all([liff.getProfile(), liff.getFriendship()]).then(function (r) {
           var data = {
-            cr: new URLSearchParams(location.search).get('cr') || '',
+            cr: getCr(),
             userId: r[0].userId,
             friend: r[1].friendFlag,
             os: liff.getOS(),
